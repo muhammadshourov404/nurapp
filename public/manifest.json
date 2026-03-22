@@ -1,0 +1,69 @@
+{
+  "name": "NurApp — আলোর পথে",
+  "short_name": "NurApp",
+  "description": "সম্পূর্ণ ইসলামিক অ্যাপ — নামাজ, কোরআন, দোয়া, তাসবিহ, কিবলা, হাদিস",
+  "start_url": "/nurapp/",
+  "scope": "/nurapp/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07070f",
+  "theme_color": "#07070f",
+  "lang": "bn",
+  "icons": [
+    {
+      "src": "/nurapp/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/nurapp/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/nurapp/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/nurapp/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/nurapp/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["lifestyle", "religion", "utilities"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "নামাজের সময়",
+      "short_name": "নামাজ",
+      "description": "আপনার এলাকার নামাজের সময়সূচি",
+      "url": "/nurapp/prayer/",
+      "icons": [{ "src": "/nurapp/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "কোরআন পাঠ",
+      "short_name": "কোরআন",
+      "description": "পবিত্র কোরআনুল করীম",
+      "url": "/nurapp/quran/",
+      "icons": [{ "src": "/nurapp/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "তাসবিহ",
+      "short_name": "তাসবিহ",
+      "description": "ডিজিটাল তাসবিহ কাউন্টার",
+      "url": "/nurapp/tasbih/",
+      "icons": [{ "src": "/nurapp/icons/icon-96.png", "sizes": "96x96" }]
+    }
+  ]
+}
