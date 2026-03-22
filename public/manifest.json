@@ -11,59 +11,34 @@
   "lang": "bn",
   "icons": [
     {
-      "src": "/nurapp/icons/icon-72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/nurapp/icons/icon-96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/nurapp/icons/icon-128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/nurapp/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/nurapp/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/nurapp/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
   "categories": ["lifestyle", "religion", "utilities"],
-  "screenshots": [],
   "shortcuts": [
     {
       "name": "নামাজের সময়",
       "short_name": "নামাজ",
       "description": "আপনার এলাকার নামাজের সময়সূচি",
       "url": "/nurapp/prayer/",
-      "icons": [{ "src": "/nurapp/icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "/nurapp/icons/icon.svg", "sizes": "any" }]
     },
     {
       "name": "কোরআন পাঠ",
       "short_name": "কোরআন",
       "description": "পবিত্র কোরআনুল করীম",
       "url": "/nurapp/quran/",
-      "icons": [{ "src": "/nurapp/icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "/nurapp/icons/icon.svg", "sizes": "any" }]
     },
     {
       "name": "তাসবিহ",
       "short_name": "তাসবিহ",
       "description": "ডিজিটাল তাসবিহ কাউন্টার",
       "url": "/nurapp/tasbih/",
-      "icons": [{ "src": "/nurapp/icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "/nurapp/icons/icon.svg", "sizes": "any" }]
     }
   ]
 }
