@@ -1,203 +1,253 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 
 export default function QiblaPage() {
   const [qiblaAngle, setQiblaAngle] = useState(null)
   const [compassAngle, setCompassAngle] = useState(0)
   const [location, setLocation] = useState(null)
+  const [cityName, setCityName] = useState('')
   const [status, setStatus] = useState('loading')
   const [lang, setLang] = useState('bn')
+  const [permissionGranted, setPermissionGranted] = useState(false)
+  const [distance, setDistance] = useState(null)
+  const intervalRef = useRef(null)
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords
-          setLocation({ lat: latitude, lon: longitude })
-          const angle = calculateQibla(latitude, longitude)
-          setQiblaAngle(angle)
-          setStatus('success')
-        },
-        () => {
-          // Default to Dhaka
-          const angle = calculateQibla(23.8103, 90.4125)
-          setQiblaAngle(angle)
-          setLocation({ lat: 23.8103, lon: 90.4125 })
-          setStatus('default')
-        }
-      )
-    }
-
-    // Compass
-    const handleOrientation = (e) => {
-      if (e.alpha !== null) {
-        setCompassAngle(e.alpha)
-      }
-    }
-
-    if (window.DeviceOrientationEvent) {
-      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission()
-          .then(r => { if (r === 'granted') window.addEventListener('deviceorientation', handleOrientation) })
-          .catch(() => {})
-      } else {
-        window.addEventListener('deviceorientation', handleOrientation)
-      }
-    }
-
-    return () => window.removeEventListener('deviceorientation', handleOrientation)
+    getLocation()
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [])
+
+  const getLocation = () => {
+    setStatus('loading')
+    navigator.geolocation?.getCurrentPosition(
+      async pos => {
+        const { latitude: lat, longitude: lon } = pos.coords
+        setLocation({ lat, lon })
+        const angle = calculateQibla(lat, lon)
+        setQiblaAngle(angle)
+        const dist = calculateDistance(lat, lon, 21.4225, 39.8262)
+        setDistance(Math.round(dist))
+        setStatus('success')
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`)
+          const data = await res.json()
+          setCityName(data.address?.city || data.address?.town || data.address?.county || '')
+        } catch {}
+      },
+      () => {
+        const lat = 23.8103, lon = 90.4125
+        setLocation({ lat, lon })
+        setQiblaAngle(calculateQibla(lat, lon))
+        setDistance(Math.round(calculateDistance(lat, lon, 21.4225, 39.8262)))
+        setCityName('ঢাকা')
+        setStatus('default')
+      }
+    )
+  }
+
+  const requestCompass = () => {
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(r => {
+          if (r === 'granted') {
+            window.addEventListener('deviceorientation', handleOrientation)
+            setPermissionGranted(true)
+          }
+        }).catch(() => {})
+    } else {
+      window.addEventListener('deviceorientation', handleOrientation)
+      setPermissionGranted(true)
+    }
+  }
+
+  const handleOrientation = (e) => {
+    if (e.webkitCompassHeading) {
+      setCompassAngle(e.webkitCompassHeading)
+    } else if (e.alpha !== null) {
+      setCompassAngle(360 - e.alpha)
+    }
+  }
 
   const calculateQibla = (lat, lon) => {
     const KAABA_LAT = 21.4225
     const KAABA_LON = 39.8262
-    const latRad = lat * Math.PI / 180
-    const lonRad = lon * Math.PI / 180
-    const kaabaLatRad = KAABA_LAT * Math.PI / 180
-    const kaabaLonRad = KAABA_LON * Math.PI / 180
-    const dLon = kaabaLonRad - lonRad
-    const y = Math.sin(dLon) * Math.cos(kaabaLatRad)
-    const x = Math.cos(latRad) * Math.sin(kaabaLatRad) -
-              Math.sin(latRad) * Math.cos(kaabaLatRad) * Math.cos(dLon)
-    const angle = Math.atan2(y, x) * 180 / Math.PI
-    return (angle + 360) % 360
+    const latR = lat * Math.PI / 180
+    const lonR = lon * Math.PI / 180
+    const kLatR = KAABA_LAT * Math.PI / 180
+    const kLonR = KAABA_LON * Math.PI / 180
+    const dLon = kLonR - lonR
+    const y = Math.sin(dLon) * Math.cos(kLatR)
+    const x = Math.cos(latR) * Math.sin(kLatR) - Math.sin(latR) * Math.cos(kLatR) * Math.cos(dLon)
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360
   }
 
-  const needleRotation = qiblaAngle !== null ? qiblaAngle - compassAngle : 0
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLon = (lon2 - lon1) * Math.PI / 180
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+  }
+
+  const needleAngle = qiblaAngle !== null ? qiblaAngle - compassAngle : 0
+  const isAligned = Math.abs(((needleAngle % 360) + 360) % 360) < 5 || Math.abs(((needleAngle % 360) + 360) % 360 - 360) < 5
 
   return (
-    <main className="min-h-screen bg-gray-950">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+    <main className="min-h-screen bg-gray-950 pb-24">
+      <header className="sticky top-0 z-50 bg-gray-950/90 backdrop-blur-xl border-b border-white/10">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/nurapp" className="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
-              ←
-            </Link>
-            <h1 className="text-lg font-bold text-white">
-              {lang === 'bn' ? '🧭 কিবলা দিকনির্দেশ' : '🧭 Qibla Direction'}
-            </h1>
+            <Link href="/" className="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all text-lg">←</Link>
+            <h1 className="text-base font-bold text-white">🧭 {lang === 'bn' ? 'কিবলা দিকনির্দেশ' : 'Qibla Direction'}</h1>
           </div>
-          <button
-            onClick={() => setLang(lang === 'bn' ? 'en' : 'bn')}
-            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-medium transition-all"
-          >
+          <button onClick={() => setLang(lang === 'bn' ? 'en' : 'bn')}
+            className="px-3 py-1.5 rounded-lg bg-white/10 text-xs font-bold border border-white/10">
             {lang === 'bn' ? 'EN' : 'বাং'}
           </button>
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="max-w-lg mx-auto px-4 py-5">
 
-        {/* Info Card */}
-        <div className="rounded-2xl gradient-green p-5 text-center mb-8">
-          <p className="text-emerald-200 text-sm mb-1">
-            {lang === 'bn' ? '📍 আপনার অবস্থান' : '📍 Your Location'}
-          </p>
-          {location && (
-            <p className="text-white font-bold">
-              {status === 'default'
-                ? (lang === 'bn' ? 'ঢাকা, বাংলাদেশ (ডিফল্ট)' : 'Dhaka, Bangladesh (Default)')
-                : `${location.lat.toFixed(4)}°N, ${location.lon.toFixed(4)}°E`}
-            </p>
-          )}
-          {qiblaAngle !== null && (
-            <p className="text-amber-300 text-sm mt-2">
-              {lang === 'bn' ? `কিবলার দিক: ${Math.round(qiblaAngle)}°` : `Qibla Direction: ${Math.round(qiblaAngle)}°`}
-            </p>
-          )}
+        {/* Location Card */}
+        <div className="rounded-2xl bg-gradient-to-br from-emerald-900 to-green-950 border border-emerald-700/30 p-4 mb-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-emerald-400 text-xs mb-1">📍 {lang === 'bn' ? 'আপনার অবস্থান' : 'Your Location'}</p>
+              <p className="text-white font-bold">{cityName || (lang === 'bn' ? 'লোড হচ্ছে...' : 'Loading...')}</p>
+              {location && (
+                <p className="text-gray-400 text-xs mt-0.5">{location.lat.toFixed(4)}°N, {location.lon.toFixed(4)}°E</p>
+              )}
+            </div>
+            <div className="text-right">
+              <p className="text-gray-400 text-xs">{lang === 'bn' ? 'কাবা থেকে দূরত্ব' : 'Distance to Kaaba'}</p>
+              <p className="text-amber-300 font-bold text-lg">{distance ? `${distance.toLocaleString()} km` : '--'}</p>
+              {qiblaAngle !== null && (
+                <p className="text-emerald-300 text-xs">{lang === 'bn' ? `কিবলা: ${Math.round(qiblaAngle)}°` : `Qibla: ${Math.round(qiblaAngle)}°`}</p>
+              )}
+            </div>
+          </div>
+          <button onClick={getLocation}
+            className="mt-3 w-full rounded-xl bg-white/10 hover:bg-white/20 py-2 text-white text-sm font-medium transition-all">
+            🔄 {lang === 'bn' ? 'লোকেশন আপডেট করুন' : 'Update Location'}
+          </button>
         </div>
 
+        {/* Aligned Message */}
+        {isAligned && permissionGranted && (
+          <div className="rounded-2xl bg-emerald-600 p-4 text-center mb-4 animate-fadeInUp">
+            <p className="text-white font-bold text-lg">🕋 {lang === 'bn' ? 'আপনি কিবলামুখী!' : 'You are facing Qibla!'}</p>
+            <p className="text-emerald-100 text-sm">{lang === 'bn' ? 'সামনে কাবা শরীফ' : 'Kaaba is ahead of you'}</p>
+          </div>
+        )}
+
         {/* Compass */}
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center mb-5">
           <div className="relative w-72 h-72">
-            {/* Outer Ring */}
-            <div className="absolute inset-0 rounded-full border-4 border-emerald-600/30 bg-gray-900 shadow-2xl">
-              {/* Direction Labels */}
-              {[
-                { label: 'N', top: '4px', left: '50%', transform: 'translateX(-50%)' },
-                { label: 'S', bottom: '4px', left: '50%', transform: 'translateX(-50%)' },
-                { label: 'E', right: '4px', top: '50%', transform: 'translateY(-50%)' },
-                { label: 'W', left: '4px', top: '50%', transform: 'translateY(-50%)' },
-              ].map((d, i) => (
-                <span
-                  key={i}
-                  className="absolute text-emerald-400 font-bold text-sm"
-                  style={{ top: d.top, bottom: d.bottom, left: d.left, right: d.right, transform: d.transform }}
-                >
-                  {d.label}
-                </span>
+            {/* Outer glow */}
+            <div className={`absolute inset-0 rounded-full transition-all duration-500 ${isAligned && permissionGranted ? 'shadow-[0_0_40px_rgba(74,222,128,0.4)]' : ''}`}></div>
+
+            {/* Compass Ring */}
+            <div className="absolute inset-0 rounded-full bg-gray-900 border-2 border-emerald-600/30">
+
+              {/* Degree marks */}
+              {Array.from({ length: 72 }).map((_, i) => (
+                <div key={i} className="absolute w-full h-full flex justify-center"
+                  style={{ transform: `rotate(${i * 5}deg)` }}>
+                  <div className={`mt-1 ${i % 18 === 0 ? 'w-0.5 h-5 bg-emerald-400' : i % 9 === 0 ? 'w-px h-3 bg-emerald-600' : 'w-px h-2 bg-gray-700'}`}></div>
+                </div>
               ))}
 
-              {/* Degree Marks */}
-              {Array.from({ length: 36 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute w-full h-full"
-                  style={{ transform: `rotate(${i * 10}deg)` }}
-                >
-                  <div className={`absolute top-2 left-1/2 -translate-x-1/2 bg-emerald-600/50 ${i % 9 === 0 ? 'w-0.5 h-4' : 'w-px h-2'}`}></div>
+              {/* Cardinal directions */}
+              {[
+                { label: 'N', angle: 0, color: 'text-red-400' },
+                { label: 'E', angle: 90, color: 'text-gray-300' },
+                { label: 'S', angle: 180, color: 'text-gray-300' },
+                { label: 'W', angle: 270, color: 'text-gray-300' },
+              ].map(d => (
+                <div key={d.label} className="absolute inset-0 flex justify-center"
+                  style={{ transform: `rotate(${d.angle}deg)` }}>
+                  <span className={`mt-6 text-xs font-bold ${d.color}`}
+                    style={{ transform: `rotate(-${d.angle}deg)` }}>{d.label}</span>
                 </div>
               ))}
 
               {/* Qibla Needle */}
               {qiblaAngle !== null && (
-                <div
-                  className="absolute inset-0 flex items-center justify-center transition-transform duration-300"
-                  style={{ transform: `rotate(${needleRotation}deg)` }}
-                >
-                  {/* Needle Up (Qibla) */}
-                  <div className="absolute bottom-1/2 left-1/2 -translate-x-1/2 flex flex-col items-center">
-                    <div className="text-2xl">🕋</div>
-                    <div className="w-1 bg-gradient-to-b from-amber-400 to-amber-600 rounded-full"
-                      style={{ height: '90px' }}
-                    ></div>
+                <div className="absolute inset-0 flex items-center justify-center transition-transform duration-300"
+                  style={{ transform: `rotate(${needleAngle}deg)` }}>
+                  {/* Up arrow (Qibla) */}
+                  <div className="absolute flex flex-col items-center" style={{ bottom: '50%' }}>
+                    <div className="text-2xl" style={{ marginBottom: '-4px' }}>🕋</div>
+                    <div className={`w-1.5 rounded-full ${isAligned && permissionGranted ? 'bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.8)]' : 'bg-amber-400'}`}
+                      style={{ height: '90px' }}></div>
                   </div>
-                  {/* Needle Down */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2">
-                    <div className="w-1 bg-gradient-to-b from-red-600 to-red-400 rounded-full"
-                      style={{ height: '70px' }}
-                    ></div>
+                  {/* Down arrow */}
+                  <div className="absolute flex flex-col items-center" style={{ top: '50%' }}>
+                    <div className="w-1.5 bg-red-500 rounded-full" style={{ height: '60px' }}></div>
                   </div>
                 </div>
               )}
 
-              {/* Center Dot */}
+              {/* Center */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-4 h-4 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50"></div>
+                <div className={`w-5 h-5 rounded-full border-2 border-gray-700 ${isAligned && permissionGranted ? 'bg-emerald-500' : 'bg-gray-600'}`}></div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Instructions */}
-        <div className="space-y-3">
+        {/* Compass Permission */}
+        {!permissionGranted && (
+          <button onClick={requestCompass}
+            className="w-full rounded-2xl bg-gradient-to-r from-emerald-600 to-green-600 py-4 text-white font-bold text-base mb-4 shadow-lg active:scale-95 transition-transform">
+            🧭 {lang === 'bn' ? 'লাইভ কম্পাস চালু করুন' : 'Enable Live Compass'}
+          </button>
+        )}
+
+        {/* Info Cards */}
+        <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-white/5 border border-white/10 p-4">
             <p className="text-emerald-400 text-xs font-bold mb-2">
               {lang === 'bn' ? '📱 কিভাবে ব্যবহার করবেন' : '📱 How to Use'}
             </p>
-            <ul className="text-gray-300 text-sm space-y-1">
-              <li>• {lang === 'bn' ? 'ফোনটি সমতলে ধরুন' : 'Hold your phone flat'}</li>
-              <li>• {lang === 'bn' ? '🕋 চিহ্নটি যেদিকে সেদিকে মুখ করুন' : 'Face the direction of 🕋 symbol'}</li>
-              <li>• {lang === 'bn' ? 'সেটিই কিবলার দিক' : 'That is the Qibla direction'}</li>
+            <ul className="text-gray-400 text-xs space-y-1.5">
+              <li>• {lang === 'bn' ? 'কম্পাস চালু করুন' : 'Enable compass'}</li>
+              <li>• {lang === 'bn' ? 'ফোন সমতলে ধরুন' : 'Hold phone flat'}</li>
+              <li>• {lang === 'bn' ? '🕋 দিকে মুখ করুন' : 'Face 🕋 direction'}</li>
             </ul>
           </div>
-
-          <div className="rounded-xl bg-amber-950/30 border border-amber-600/30 p-4">
-            <p className="text-amber-400 text-xs font-bold mb-1">
-              {lang === 'bn' ? '⚠️ দ্রষ্টব্য' : '⚠️ Note'}
-            </p>
-            <p className="text-gray-300 text-xs leading-relaxed">
-              {lang === 'bn'
-                ? 'কম্পাস সঠিকভাবে কাজ করতে ডিভাইসের অনুমতি প্রয়োজন। ধাতব বস্তু থেকে দূরে রাখুন।'
-                : 'Compass needs device permission to work properly. Keep away from metal objects.'}
-            </p>
+          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+            <p className="text-amber-400 text-xs font-bold mb-2">🕋 {lang === 'bn' ? 'কাবা শরীফ' : 'Holy Kaaba'}</p>
+            <p className="text-gray-400 text-xs">21.4225°N</p>
+            <p className="text-gray-400 text-xs">39.8262°E</p>
+            <p className="text-gray-400 text-xs mt-1">{lang === 'bn' ? 'মক্কা, সৌদি আরব' : 'Makkah, Saudi Arabia'}</p>
           </div>
         </div>
 
       </div>
+
+      {/* Bottom Nav */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-xl border-t border-white/10 z-50">
+        <div className="max-w-lg mx-auto flex items-center justify-around py-2">
+          {[
+            { href: '/', icon: '🏠', label: lang === 'bn' ? 'হোম' : 'Home' },
+            { href: '/prayer', icon: '🕐', label: lang === 'bn' ? 'নামাজ' : 'Prayer' },
+            { href: '/quran', icon: '📖', label: lang === 'bn' ? 'কোরআন' : 'Quran' },
+            { href: '/dua', icon: '🤲', label: lang === 'bn' ? 'দোয়া' : 'Dua' },
+            { href: '/tasbih', icon: '📿', label: lang === 'bn' ? 'তাসবিহ' : 'Tasbih' },
+          ].map((item, i) => (
+            <Link key={i} href={item.href}
+              className={`flex flex-col items-center gap-1 px-2 py-1 rounded-xl transition-all ${item.href === '/qibla' ? 'bg-emerald-600/20' : 'hover:bg-white/10'}`}>
+              <span className="text-xl">{item.icon}</span>
+              <span className={`text-xs ${item.href === '/qibla' ? 'text-emerald-400' : 'text-gray-400'}`}>{item.label}</span>
+            </Link>
+          ))}
+        </div>
+      </nav>
     </main>
   )
 }
