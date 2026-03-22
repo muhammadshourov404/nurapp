@@ -60,7 +60,7 @@ export default function TasbihPage() {
       localStorage.setItem('tasbih_history', JSON.stringify(updated))
     }
     setCount(0)
-    setRoundsше(0)
+    setRounds(0)
     setCompleted(false)
   }
 
